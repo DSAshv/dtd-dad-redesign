@@ -6,19 +6,24 @@
 <title>Voter List Search — Redesign</title>
 <style>
   * { box-sizing: border-box; }
-  body {
+  html, body {
+    height: 100%;
     margin: 0;
+  }
+  body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: #E8EAF6;
     display: flex;
     justify-content: center;
-    padding: 24px 12px;
+    align-items: stretch;
   }
   .phone {
     max-width: 400px;
     width: 100%;
+    height: 100vh;
     background: #fff;
-    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
     box-shadow: 0 4px 24px rgba(0,0,0,0.12);
   }
@@ -29,13 +34,21 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    flex-shrink: 0;
   }
   .header button {
     background: none; border: none; color: #fff;
     font-size: 20px; cursor: pointer; padding: 4px;
   }
   .header .title { font-size: 16px; font-weight: 500; flex: 1; }
-  .body { padding: 16px 16px 4px; }
+
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    padding: 16px 16px 4px;
+  }
   .subtext { font-size: 13px; color: #666; margin-bottom: 12px; }
   .type-grid {
     display: grid;
@@ -82,9 +95,12 @@
   }
   .search-btn.enabled { background: #4B41C7; color: #fff; cursor: pointer; }
   .note { font-size: 12px; color: #999; margin-bottom: 16px; }
+  .spacer { flex: 1; }
+
   .keyboard-bar {
     display: none; background: #f5f5f5; border-top: 1px solid #ddd;
-    padding: 12px 16px; justify-content: space-between; align-items: center;
+    padding: 10px 16px; justify-content: space-between; align-items: center;
+    flex-shrink: 0;
   }
   .keyboard-bar span { font-size: 12px; color: #999; }
   .hide-kb-btn {
@@ -92,6 +108,27 @@
     border: 1px solid #bbb; border-radius: 8px; padding: 8px 14px;
     font-size: 13px; cursor: pointer;
   }
+
+  .fake-keyboard {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    background: #1c1c1e;
+    padding: 8px 4px 14px;
+    flex-shrink: 0;
+  }
+  .fake-keyboard .key-row { display: flex; justify-content: center; gap: 5px; }
+  .fake-keyboard .key {
+    background: #4a4a4c; color: #fff; border-radius: 5px;
+    flex: 1; max-width: 30px; height: 38px;
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+    cursor: pointer; user-select: none;
+  }
+  .fake-keyboard .key:active { background: #6a6a6c; }
+  .fake-keyboard .key-wide { max-width: none; flex: none; width: 34px; background: #3a3a3c; }
+  .fake-keyboard .key-space { max-width: none; flex: 1; }
+  .fake-keyboard .key-done { max-width: none; flex: none; width: 64px; background: #0a84ff; font-weight: 500; font-size: 13px; }
+
   .toast {
     position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
     max-width: 340px; width: 90%; text-align: center; font-size: 13px;
@@ -101,6 +138,7 @@
   }
   .toast.show { opacity: 1; bottom: 30px; }
   .toast.error { background: #c62828; }
+
   .modal-overlay {
     display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
     align-items: center; justify-content: center; z-index: 200;
@@ -129,7 +167,7 @@
     <div class="title">Search Your Name in Voter List</div>
   </div>
 
-  <div class="body">
+  <div class="scroll-area" id="scrollArea">
     <div class="subtext">Choose how you want to search, then enter your details below.</div>
 
     <div class="type-grid">
@@ -165,19 +203,22 @@
     </div>
 
     <div class="input-wrap">
-      <input id="epicInput" placeholder="e.g. ABC1234567" autocomplete="off" />
+      <input id="epicInput" placeholder="e.g. ABC1234567" autocomplete="off" readonly />
       <button class="clear-btn" id="clearBtn" aria-label="Clear input">✕</button>
     </div>
     <div class="validation-msg" id="validationMsg"></div>
 
     <button class="search-btn" id="searchBtn" disabled>Search</button>
     <div class="note">If needed, you may change the Voter ID/EPIC to a different one.</div>
+    <div class="spacer"></div>
   </div>
 
   <div class="keyboard-bar" id="keyboardBar">
     <span>Keyboard open</span>
     <button class="hide-kb-btn" id="hideKeyboardBtn">⌨ Hide keyboard</button>
   </div>
+
+  <div class="fake-keyboard" id="fakeKeyboard"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -199,8 +240,10 @@ const searchBtn = document.getElementById('searchBtn');
 const validationMsg = document.getElementById('validationMsg');
 const helperTextInner = document.getElementById('helperTextInner');
 const keyboardBar = document.getElementById('keyboardBar');
+const fakeKeyboard = document.getElementById('fakeKeyboard');
 const modalOverlay = document.getElementById('modalOverlay');
 const toast = document.getElementById('toast');
+const scrollArea = document.getElementById('scrollArea');
 
 let currentType = {
   type: 'epic',
@@ -208,6 +251,63 @@ let currentType = {
   help: "Enter the 10-character Voter ID/EPIC printed on your card (3 letters + 7 digits).",
   regex: /^[A-Za-z]{3}[0-9]{7}$/
 };
+
+// Build the simulated on-screen QWERTY keyboard
+const rows = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
+function buildKeyboard() {
+  fakeKeyboard.innerHTML = '';
+  rows.forEach((row, i) => {
+    const rowDiv = document.createElement('div');
+    rowDiv.className = 'key-row';
+    if (i === 2) {
+      const shift = document.createElement('div');
+      shift.className = 'key key-wide';
+      shift.textContent = '⇧';
+      rowDiv.appendChild(shift);
+    }
+    row.split('').forEach(ch => {
+      const key = document.createElement('div');
+      key.className = 'key';
+      key.textContent = ch;
+      key.addEventListener('click', () => { input.value += ch; updateSearchState(); });
+      rowDiv.appendChild(key);
+    });
+    if (i === 2) {
+      const del = document.createElement('div');
+      del.className = 'key key-wide';
+      del.textContent = '⌫';
+      del.addEventListener('click', () => { input.value = input.value.slice(0, -1); updateSearchState(); });
+      rowDiv.appendChild(del);
+    }
+    fakeKeyboard.appendChild(rowDiv);
+  });
+  const bottomRow = document.createElement('div');
+  bottomRow.className = 'key-row';
+  bottomRow.style.marginTop = '2px';
+  const space = document.createElement('div');
+  space.className = 'key key-space';
+  space.textContent = 'space';
+  space.addEventListener('click', () => { input.value += ' '; updateSearchState(); });
+  const done = document.createElement('div');
+  done.className = 'key key-done';
+  done.textContent = 'Done';
+  done.addEventListener('click', closeKeyboard);
+  bottomRow.appendChild(space);
+  bottomRow.appendChild(done);
+  fakeKeyboard.appendChild(bottomRow);
+}
+buildKeyboard();
+
+function openKeyboard() {
+  keyboardBar.style.display = 'flex';
+  fakeKeyboard.style.display = 'flex';
+  setTimeout(() => { scrollArea.scrollTop = scrollArea.scrollHeight; }, 50);
+}
+function closeKeyboard() {
+  keyboardBar.style.display = 'none';
+  fakeKeyboard.style.display = 'none';
+  showToast('Keyboard closed — your entry is still here', true);
+}
 
 function showToast(msg, ok) {
   toast.textContent = msg;
@@ -267,20 +367,15 @@ function disableSearch() {
   searchBtn.classList.remove('enabled');
 }
 
-input.addEventListener('input', updateSearchState);
-input.addEventListener('focus', () => { keyboardBar.style.display = 'flex'; });
+// Tapping the input opens the simulated keyboard instead of the real one
+input.addEventListener('click', openKeyboard);
 
 clearBtn.addEventListener('click', () => {
   input.value = '';
   updateSearchState();
-  input.focus();
 });
 
-document.getElementById('hideKeyboardBtn').addEventListener('click', () => {
-  keyboardBar.style.display = 'none';
-  input.blur();
-  showToast('Keyboard closed — your entry is still here', true);
-});
+document.getElementById('hideKeyboardBtn').addEventListener('click', closeKeyboard);
 
 searchBtn.addEventListener('click', () => {
   if (searchBtn.disabled) return;
@@ -311,7 +406,6 @@ document.getElementById('backBtn').addEventListener('click', () => {
 
 document.getElementById('stayBtn').addEventListener('click', () => {
   modalOverlay.classList.remove('show');
-  input.focus();
 });
 
 document.getElementById('discardBtn').addEventListener('click', () => {
