@@ -1,4 +1,4 @@
-#Week 5 assignment DTD-DAD: What I Changed and Why
+# Week 5 assignment DTD-DAD: What I Changed and Why
 
 When I used the original app, I accidentally lost the data I had entered because I used the phone's back gesture to close the keyboard. Instead of hiding the keyboard, the app immediately went back to the previous screen without any warning. I redesigned the screen to fix this issue and improve the overall user experience.
 
