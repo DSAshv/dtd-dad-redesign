@@ -1,9 +1,15 @@
-DTD-DAD Week 5 assignment
+#Week 5 assignment DTD-DAD: What I Changed and Why
 
-What I changed and why
+When I used the original app, I accidentally lost the data I had entered because I used the phone's back gesture to close the keyboard. Instead of hiding the keyboard, the app immediately went back to the previous screen without any warning. I redesigned the screen to fix this issue and improve the overall user experience.
 
-Your original bug — the back gesture silently discarding form data — is a constraint failure: the app let a destructive action happen with zero friction. The redesign fixes that plus the two other heuristics you named:
+## Constraint
 
-Constraint: Back now checks if there's unsaved input. If so, it blocks the navigation and forces a choice ("Keep editing" / "Discard and go back") instead of silently leaving. Search stays disabled until input actually matches the expected format for the selected type, so you can't submit garbage.
-Discoverability: Each search-type card now shows a clear selected/unselected state (was previously always purple regardless of selection) and a helper line explains exactly what format to enter for that method. A persistent "Hide keyboard" bar appears the moment you tap the input, so you never need the risky back-gesture just to dismiss the keyboard.
-Feedback: Real-time inline validation ("Looks good" / format hint) as you type, a loading state on Search, and toast confirmations for every state-changing action (keyboard closed, entry discarded, search complete) — so nothing happens invisibly.
+I changed the back action so that if I have unsaved input, the app first asks whether I want to **Keep Editing** or **Discard and Go Back** instead of leaving the page immediately. This prevents accidental data loss. I also disabled the **Search** button until the entered value matches the expected format for the selected search method, preventing invalid searches.
+
+## Discoverability
+
+I made the selected search method much more obvious by giving it a clear selected state while keeping the others unselected. I also added helper text below the input field to show the expected format (for example, an EPIC number). Since I originally used the back gesture just to hide the keyboard, I added a persistent **Hide Keyboard** button whenever the keyboard is open so that the correct action is easy to find.
+
+## Feedback
+
+I added real-time validation while typing so the app immediately tells me whether my input is valid or if it needs correction. When I tap **Search**, the app now shows a loading indicator instead of appearing unresponsive. I also added toast messages to confirm actions such as closing the keyboard, discarding unsaved changes, and completing the search, so I always know what the app is doing.
